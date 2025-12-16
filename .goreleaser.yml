@@ -1,9 +1,5 @@
 version: 2
 
-before:
-  hooks:
-    - go mod tidy
-
 builds:
   - id: mockserver
     main: ./cmd/rmq-rpc-mockserver
@@ -39,5 +35,30 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 
-snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+dockers_v2:
+  - id: mockserver
+    dockerfile: goreleaser.Dockerfile
+    ids:
+      - mockserver
+
+    images:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}"
+
+    tags:
+      - "{{ .Version }}"
+      - latest
+
+    platforms:
+      - linux/amd64
+      - linux/arm64
+
+    labels:
+      "org.opencontainers.image.created": "{{.Date}}"
+      "org.opencontainers.image.title": "{{.ProjectName}}"
+      "org.opencontainers.image.revision": "{{.FullCommit}}"
+      "org.opencontainers.image.version": "{{.Version}}"
+      "org.opencontainers.image.source": "{{.GitURL}}"
+
+    # optional "pull" behavior (GoReleaser expects flags with '=')
+    flags:
+      - "--pull=true"

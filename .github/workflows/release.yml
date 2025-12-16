@@ -2,27 +2,23 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      force_bump:
-        description: 'Force version bump (patch/minor/major)'
-        required: false
-        type: choice
-        options:
-          - ''
-          - patch
-          - minor
-          - major
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
+  packages: write
 
 env:
-  GO_VERSION: '1.23.1'
+  GO_VERSION: '1.24.0'
+  GORELEASER_VERSION: '2.13.1'
 
 jobs:
   release:
     name: Create Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/master'
 
     steps:
@@ -35,6 +31,26 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: v${{ env.GORELEASER_VERSION }}
+          install-only: true
 
       - name: Install semantic-release
         run: |
@@ -44,6 +60,7 @@ jobs:
       - name: Run semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           ./semantic-release \
             --allow-initial-development-versions \
