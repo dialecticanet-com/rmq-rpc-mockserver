@@ -37,7 +37,7 @@ checksum:
 dockers:
   - id: mockserver-amd64
     ids: [mockserver]
-    dockerfile: Dockerfile
+    dockerfile: goreleaser.Dockerfile
     use: buildx
     goos: linux
     goarch: amd64
@@ -50,7 +50,7 @@ dockers:
 
   - id: mockserver-arm64
     ids: [mockserver]
-    dockerfile: Dockerfile
+    dockerfile: goreleaser.Dockerfile
     use: buildx
     goos: linux
     goarch: arm64
