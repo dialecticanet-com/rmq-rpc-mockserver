@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_bump:
+        description: 'Force version bump (patch/minor/major)'
+        required: false
+        type: choice
+        options:
+          - ''
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: '1.23.1'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install semantic-release
+        run: |
+          curl -SL https://github.com/go-semantic-release/semantic-release/releases/download/v2.30.0/semantic-release_v2.30.0_linux_amd64 -o ./semantic-release
+          chmod +x ./semantic-release
+
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./semantic-release \
+            --allow-initial-development-versions \
+            --allow-no-changes \
+            --force-bump-patch-version \
+            --hooks goreleaser \
+            --provider-opt "slug=${{ github.repository }}"
+
