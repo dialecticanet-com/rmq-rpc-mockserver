@@ -1,0 +1,45 @@
+version: "2"
+run:
+  tests: false
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - contextcheck
+    - copyloopvar
+    - cyclop
+    - errcheck
+    - errname
+    - errorlint
+    - gocognit
+    - goconst
+    - gocritic
+    - godot
+    - gosec
+    - govet
+    - ineffassign
+    - ireturn
+    - misspell
+    - nestif
+    - nilerr
+    - prealloc
+    - staticcheck
+    - tparallel
+    - unconvert
+    - unparam
+    - unused
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

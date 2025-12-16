@@ -1,0 +1,329 @@
+syntax = "proto3";
+
+package rmqrpc.mockserver.api.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/dialecticanet-com/rmq-rpc-mockserver/api/v1;v1";
+
+service AmqpMockServerService {
+  // CreateExpectation creates an expectation for a request.
+  // This allows mocking third-party services for testing purposes by defining expected requests
+  // and the corresponding responses.
+  rpc CreateExpectation(CreateExpectationRequest) returns (CreateExpectationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/expectations"
+      body: "*"
+    };
+  }
+
+  // GetAssertions retrieves a list of all historical assertions.
+  rpc GetAssertions(GetAssertionsRequest) returns (GetAssertionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/assertions"
+    };
+  }
+
+  // GetAllExpectations retrieves a list of all active expectations.
+  rpc GetExpectations(GetExpectationsRequest) returns (GetExpectationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/expectations"
+    };
+  }
+
+  // GetExpectation retrieves a specific expectation by its ID.
+  rpc GetExpectation(GetExpectationRequest) returns (GetExpectationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/expectations/{expectation_id}"
+      response_body: "expectation"
+    };
+  }
+
+  // ResetExpectations resets all expectations, effectively removing all mock configurations.
+  // Use this to clear existing expectations when starting a new test cycle.
+  rpc ResetExpectations(ResetExpectationsRequest) returns (ResetExpectationsResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/expectations"
+    };
+  }
+
+  // AddSubscription subscribes to an existing RabbitMQ queue.
+  // This allows the mockserver to receive requests from specific queues.
+  // IMPORTANT: This method does not create a queue, it only subscribes to an existing one.
+  rpc AddSubscription(AddSubscriptionRequest) returns (AddSubscriptionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/subscriptions"
+      body: "*"
+      response_body: "subscription"
+    };
+  }
+
+  // DeleteSubscription removes a subscription from a queue by subscription ID.
+  rpc DeleteSubscription(DeleteSubscriptionRequest) returns (DeleteSubscriptionResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/subscriptions/{subscription_id}"
+    };
+  }
+
+  // UnsubscribeFromQueue unsubscribes from all subscriptions related to a specific queue.
+  rpc UnsubscribeFromQueue(UnsubscribeFromQueueRequest) returns (UnsubscribeFromQueueResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/subscriptions/queues/{queue}"
+    };
+  }
+
+  // GetAllSubscriptions retrieves a list of all active subscriptions.
+  rpc GetAllSubscriptions(GetAllSubscriptionsRequest) returns (GetAllSubscriptionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/subscriptions"
+      response_body: "subscriptions"
+    };
+  }
+
+  // ResetSubscriptions unsubscribes the mockserver from all queues.
+  rpc ResetSubscriptions(ResetSubscriptionsRequest) returns (ResetSubscriptionsResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/subscriptions"
+    };
+  }
+
+  // ResetAll resets both expectations and subscriptions, bringing the mockserver to its initial state.
+  rpc ResetAll(ResetAllRequest) returns (ResetAllResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/reset"
+    };
+  }
+
+  // GetVersion returns the version information of the mockserver application.
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/version"
+    };
+  }
+}
+
+message Subscription {
+  string id = 1;
+  string queue = 2;
+}
+
+// AddSubscriptionRequest is a request to add a subscription to a queue
+message AddSubscriptionRequest {
+  // queue is the name of the queue to subscribe to.
+  string queue = 1;
+  // idempotent indicates if the subscription should be idempotent.
+  // If true, adding a subscription with the same queue name multiple times will result in only one subscription.
+  bool idempotent = 2;
+}
+
+// AddSubscriptionResponse returns the newly created subscription.
+message AddSubscriptionResponse {
+  Subscription subscription = 1;
+}
+
+// DeleteSubscriptionRequest is a request to remove a subscription from a queue.
+message DeleteSubscriptionRequest {
+  string subscription_id = 1;
+}
+
+// DeleteSubscriptionResponse is returned after a subscription is successfully removed.
+message DeleteSubscriptionResponse {}
+
+// UnsubscribeFromQueueRequest is used to remove all subscriptions from a specified queue.
+message UnsubscribeFromQueueRequest {
+  string queue = 1;
+}
+
+// UnsubscribeFromQueueResponse confirms the successful removal of subscriptions from the queue.
+message UnsubscribeFromQueueResponse {}
+
+// GetAllSubscriptionsRequest is used to retrieve all active subscriptions.
+message GetAllSubscriptionsRequest {}
+
+// GetAllSubscriptionsResponse contains a list of active subscriptions.
+message GetAllSubscriptionsResponse {
+  repeated Subscription subscriptions = 1;
+}
+
+// JSONBodyAssertion is used to specify matching rules for JSON body content.
+message JSONBodyAssertion {
+  enum MatchType {
+    // Unspecified match type. If not set, it defaults to EXACT.
+    MATCH_TYPE_UNSPECIFIED = 0;
+    // Exact match of the JSON body.
+    MATCH_TYPE_EXACT = 1;
+    // Partial match of the JSON body; only specified fields need to be present.
+    MATCH_TYPE_PARTIAL = 2;
+  }
+  // The JSON structure to be matched.
+  google.protobuf.Struct body = 1;
+  // Type of matching for the JSON body.
+  MatchType match_type = 2;
+}
+
+// RegexBodyAssertion is used to specify matching rules using regular expressions.
+message RegexBodyAssertion {
+  // regex is the pattern that should match the body of the request.
+  string regex = 1;
+}
+
+// Request represents an incoming request that the mockserver should expect.
+message Request {
+  // The exchange the message is sent to.
+  string exchange = 1;
+  // The routing key the message is sent with.
+  string routing_key = 2;
+  oneof body {
+    // Match the JSON body of the request.
+    JSONBodyAssertion json_body = 3;
+    // Match the body of the request using a regular expression.
+    RegexBodyAssertion regex_body = 4;
+  }
+}
+
+// Response represents a response that the mockserver should return when the expectation is met.
+message Response{
+  // The response body to be returned.
+  google.protobuf.Value body = 1;
+}
+
+// Times represents the number of times an expectation should/can be met
+message Times {
+  oneof times {
+    // remaining_times is the number of times the expectation can be met.
+    uint32 remaining_times = 1;
+    // unlimited indicates that the expectation can be met an unlimited number of times.
+    bool unlimited = 2;
+  }
+}
+
+// CreateExpectationRequest is used to define an expectation for an incoming request.
+message CreateExpectationRequest {
+  // request is the expected request details.
+  Request request = 1;
+  // response is a response that should be returned when the expectation is met.
+  Response response = 2;
+  // times is a number of times the expectation should be met
+  // if is not set, the expectation is set to be met once
+  optional Times times = 3;
+  // time_to_live_seconds is a time to live for the expectation in seconds
+  // if time_to_live_seconds is not set, then the expectation is set to be live forever
+  optional float time_to_live_seconds = 4;
+}
+
+// Expectation represents an expectation for an incoming request.
+message Expectation {
+  // id is a unique identifier for the expectation.
+  string id = 1;
+  // request is the expected request details.
+  Request request = 2;
+  // response is a response that should be returned when the expectation is met.
+  Response response = 3;
+  // times is a number of times the expectation should be met
+  Times times = 4;
+  // expires_at is a time when the expectation expires
+  optional string expires_at = 5;
+  // created_at is a time when the expectation was created
+  string created_at = 6;
+}
+
+// Assertion represents an assertion for an incoming request.
+message Assertion {
+  // id is a unique identifier for the assertion.
+  string id = 1;
+  // candidate is a candidate request sent to the mockserver.
+  Candidate candidate = 2;
+  // matched is a boolean indicating if the assertion matched an expectation.
+  bool matched = 3;
+  // expectation is a matched expectation.
+  // have value if the assertion is matched and "included" in request is set to embed expectation
+  optional Expectation expectation = 4;
+  // created_at is a time when the assertion was created.
+  string created_at = 5;
+
+  // Candidate represents a candidate request sent to the mockserver.
+  message Candidate {
+    // The exchange the message is sent to.
+    string exchange = 1;
+    // The routing key the message is sent with.
+    string routing_key = 2;
+    // The candidate JSON structure to be matched.
+    google.protobuf.Struct body = 3;
+  }
+}
+
+// GetAssertionsRequest is used to retrieve history of assertions.
+message GetAssertionsRequest {
+  // expectation_id will return only assertions for the given expectation.
+  optional string expectation_id = 1;
+  // status will return only assertions with the given status. by default it returns all assertions.
+  optional string status = 2; // matched, unmatched
+  // include will return embedded entities related to the assertion.
+  repeated string include = 3; // expectation
+}
+
+// GetAssertionsResponse contains a list of assertions.
+message GetAssertionsResponse {
+  repeated Assertion assertions = 1;
+}
+
+// GetExpectationsRequest is used to retrieve all expectations.
+message GetExpectationsRequest {
+  // status will return only expectations with the given status. by default it returns all expectations.
+  optional string status = 1; // active, expired
+}
+
+// GetExpectationsResponse contains a list of expectations.
+message GetExpectationsResponse {
+  repeated Expectation expectations = 1;
+}
+
+// GetExpectationRequest is used to retrieve a specific expectation by its ID.
+message GetExpectationRequest {
+  // expectation_id is a unique identifier for the expectation.
+  string expectation_id = 1;
+}
+
+// GetExpectationResponse contains the requested expectation.
+message GetExpectationResponse {
+  Expectation expectation = 1;
+}
+
+// CreateExpectationResponse is a response to CreateExpectationRequest
+message CreateExpectationResponse {
+  // expectation_id is a unique identifier for the created expectation.
+  string expectation_id = 1;
+}
+
+// ResetExpectationsRequest is used to reset all expectations.
+message ResetExpectationsRequest {}
+
+// ResetExpectationsResponse is returned after all expectations are successfully reset.
+message ResetExpectationsResponse {}
+
+// ResetSubscriptionsRequest is used to reset all subscriptions.
+message ResetSubscriptionsRequest {}
+
+// ResetSubscriptionsResponse is returned after all subscriptions are successfully reset.
+message ResetSubscriptionsResponse {}
+
+// ResetAllRequest is used to reset both expectations and subscriptions.
+message ResetAllRequest {}
+
+// ResetAllResponse is returned after both expectations and subscriptions are successfully reset.
+message ResetAllResponse {}
+
+// GetVersionRequest is used to retrieve the version information of the mockserver application.
+message GetVersionRequest {}
+
+// GetVersionResponse contains the version information of the mockserver application.
+message GetVersionResponse {
+  // version is the semantic version of the mockserver application.
+  string version = 1;
+  // commit_hash is the commit hash of the mockserver application.
+  string commit_hash = 2;
+  // build_date is the date the mockserver application was built.
+  string build_date = 3;
+}
+

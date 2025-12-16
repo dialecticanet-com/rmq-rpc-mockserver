@@ -1,0 +1,6 @@
+coverage.txt
+gl-code-quality-report.json
+profile.cov
+coverage.out
+third_party/
+/.vscode
