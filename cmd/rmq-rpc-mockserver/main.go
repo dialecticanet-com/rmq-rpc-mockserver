@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	service    = "amqp-mockserver"
+	service    = "rmq-rpc-mockserver"
 	version    = "dev"
 	commitHash = "0000000"
 	buildDate  = time.Now().String()

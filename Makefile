@@ -25,7 +25,7 @@ test-cover:
 
 ## run: Runs the application
 run:
-	go run ./cmd/mockserver/main.go --env=.env.local
+	go run ./cmd/rmq-rpc-mockserver/main.go --env=.env.local
 
 ## proto-install: Install proto generation tools
 proto-install:
