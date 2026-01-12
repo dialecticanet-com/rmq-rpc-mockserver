@@ -1,145 +1,173 @@
-# RMQ RPC MockServer
+# RabbitMQ RPC MockServer
 
-A MockServer for testing RabbitMQ RPC-based integrations. This service allows you to create expectations for incoming AMQP messages and return predefined responses, making it easy to test systems that interact with RabbitMQ without requiring the actual third-party services.
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/go-1.23%2B-blue.svg)](https://golang.org/dl/)
+
+A mock server for testing RabbitMQ RPC applications. 
+Define expectations for incoming RMQ RPC requests and specify the responses that should be returned, 
+making it easy to test and develop messaging applications without depending on actual third-party services.
 
 ## Features
 
-- **Expectations Management**: Define expected AMQP requests and their corresponding responses
-- **Queue Subscriptions**: Dynamically subscribe to RabbitMQ queues for message interception
-- **Assertions History**: Track all incoming messages and their matching status
-- **gRPC API**: Full-featured gRPC API with generated Go client code
-- **HTTP/REST API**: RESTful HTTP endpoints via gRPC-Gateway
-- **Flexible Matching**: Support for exact JSON matching, partial JSON matching, and regex patterns
-- **TTL Support**: Set time-to-live for expectations
-- **Multiple Response Modes**: Respond once, N times, or unlimited times
+- **Dual API Interface**: Manage via gRPC or HTTP JSON APIs
+- **Flexible Message Matching**: Exact JSON, partial JSON, and regex-based matching
+- **Priority-based Expectations**: Control match order with configurable priorities
+- **Lifetime Management**: Set TTL and usage count limits for expectations
+- **Assertions Tracking**: Monitor all requests and their matching status
+- **Dynamic Queue Management**: Subscribe/unsubscribe from queues at runtime
+- **Real-time Logging**: Detailed logs for debugging and monitoring
 
-## Quick Start
+## Installation
 
-### Prerequisites
-
-- Go 1.24+
-- RabbitMQ instance running
-- Protocol Buffers compiler (`protoc`) for code generation
-
-### Installation
+### Using Docker
 
 ```bash
-# Clone the repository
+docker pull ghcr.io/dialecticanet-com/rmq-rpc-mockserver:latest
+
+docker run -p 8080:8080 -p 8081:8081 \
+  -e RABBITMQ_URL=amqp://guest:guest@localhost:5672 \
+  ghcr.io/dialecticanet-com/rmq-rpc-mockserver:latest
+```
+
+**Note**: If RabbitMQ is running on the host machine, you might need to use `--network host` or `host.docker.internal`.
+
+### Building from Source
+
+```bash
 git clone https://github.com/dialecticanet-com/rmq-rpc-mockserver.git
 cd rmq-rpc-mockserver
-
-# Install dependencies
 go mod download
-
-# Run RabbitMQ (if needed)
-make rmq
-
-# Run the MockServer
 make run
 ```
 
-### Using the gRPC Client
+### Downloading Pre-built Binaries
 
-Import the generated client code in your Go project:
+Download the latest release from the [Releases Page](https://github.com/dialecticanet-com/rmq-rpc-mockserver/releases).
 
-```go
-import v1 "github.com/dialecticanet-com/rmq-rpc-mockserver/api/v1"
-```
+## Quick Start
 
-See [api/README.md](api/README.md) for detailed client usage examples and API documentation.
-
-## Development
-
-### Running Tests
+### 1. Start the MockServer
 
 ```bash
-# Ensure RabbitMQ is running
-make rmq
-
-# In another terminal, run tests
-make test
+docker run -p 8080:8080 -p 8081:8081 \
+  -e RABBITMQ_URL=amqp://guest:guest@localhost:5672 \
+  ghcr.io/dialecticanet-com/rmq-rpc-mockserver:latest
 ```
 
-### Linting
+### 2. Subscribe to a Queue
 
 ```bash
-make lint
+curl -X POST http://localhost:8080/api/v1/subscriptions \
+  -H "Content-Type: application/json" \
+  -d '{"queue": "my-service-queue", "idempotent": true}'
 ```
 
-### Proto Code Generation
+Keep in mind that the queue must already exist in RabbitMQ. Mockserver will not create it.
 
-If you modify the proto file, regenerate the Go code:
+### 3. Create an Expectation
 
 ```bash
-# Install proto generation tools (first time only)
-make proto-install
-
-# Generate Go code from proto files
-make proto-gen
-
-# Clean generated files
-make proto-clean
+curl -X POST http://localhost:8080/api/v1/expectations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request": {
+      "exchange": "my_exchange",
+      "routing_key": "my.routing.key",
+      "json_body": {
+        "body": {"action": "create", "userId": 123},
+        "match_type": "MATCH_TYPE_PARTIAL"
+      }
+    },
+    "response": {
+      "body": {"status": "success", "userId": 123}
+    },
+    "times": {"remaining_times": 5},
+    "priority": 10
+  }'
 ```
 
-## API Documentation
+### 4. Send a Request
 
-- **gRPC API**: See [api/README.md](api/README.md) for complete API documentation and usage examples
-- **Proto Definition**: [api/v1/mockserver.proto](api/v1/mockserver.proto)
+Use your RabbitMQ RPC client to send a request to the queue.
+The MockServer will match it against expectations and return the configured response.
 
-## Architecture
+### 5. Check Assertions
 
-The MockServer consists of:
-
-- **AMQP Consumer**: Listens to subscribed RabbitMQ queues
-- **Expectations Engine**: Matches incoming requests against defined expectations
-- **Assertions Tracker**: Records all requests and their matching results
-- **gRPC Server**: Provides management API for expectations and subscriptions
-- **HTTP Gateway**: Exposes REST endpoints for the gRPC API
-
-## Project Structure
-
-```
-.
-├── api/                    # gRPC API definitions and generated code
-│   ├── v1/
-│   │   ├── mockserver.proto          # Proto definition
-│   │   ├── mockserver.pb.go          # Generated protobuf messages
-│   │   ├── mockserver_grpc.pb.go     # Generated gRPC client/server
-│   │   └── mockserver.pb.gw.go       # Generated HTTP gateway
-│   └── README.md           # API documentation
-├── app/                    # Application entry points
-├── internal/               # Internal packages
-│   ├── app/                # Application logic
-│   ├── config/             # Configuration
-│   ├── domain/             # Domain models and business logic
-│   └── infra/              # Infrastructure (AMQP, gRPC)
-├── lib/                    # Reusable libraries
-├── Makefile                # Build and development tasks
-└── go.mod                  # Go module definition
+```bash
+curl http://localhost:8080/api/v1/assertions?status=matched
 ```
 
 ## Configuration
 
-Configuration is done via environment variables. See `.env.local` for an example configuration file.
+Configure the MockServer using environment variables:
 
-## Makefile Targets
+| Variable                              | Required | Default | Description                                                          |
+|---------------------------------------|----------|---------|----------------------------------------------------------------------|
+| `RABBITMQ_URL`                        | **Yes**  | N/A     | RabbitMQ connection string (e.g., `amqp://user:pass@localhost:5672`) |
+| `RABBITMQ_CONNECTION_TIMEOUT_SECONDS` | No       | `300`   | Initial connection timeout in seconds                                |
+| `AMQP_QUEUES`                         | No       | N/A     | Comma-separated list of queues to subscribe to at startup            |
+| `LOG_LEVEL`                           | No       | `info`  | Logging level: `debug`, `info`, `warn`, or `error`                   |
+| `HTTP_PORT`                           | No       | `8080`  | HTTP API port                                                        |
+| `GRPC_PORT`                           | No       | `8081`  | gRPC API port                                                        |
+
+**Example `.env` file**:
 
 ```bash
-make help              # Show all available targets
-make test              # Run tests
-make lint              # Run linter
-make run               # Run the application
-make rmq               # Run RabbitMQ container
-make proto-install     # Install proto generation tools
-make proto-gen         # Generate code from proto files
-make proto-clean       # Remove generated proto files
+RABBITMQ_URL=amqp://guest:guest@localhost:5672
+AMQP_QUEUES=service-queue-1,service-queue-2
+LOG_LEVEL=debug
+HTTP_PORT=8080
+GRPC_PORT=8081
 ```
 
-## License
+## Documentation
 
-See [LICENSE](LICENSE) file for details.
+- **[API Documentation](docs/API.md)** - Complete API reference for gRPC and HTTP endpoints
+- **[Architecture](docs/ARCHITECTURE.md)** - System design, components, and request flow
+- **[Development Guide](docs/DEVELOPMENT.md)** - Setup, testing, and contribution guidelines
+
+## API Overview
+
+The MockServer exposes two equivalent APIs:
+
+- **HTTP JSON API**: `http://localhost:8080/api/v1`
+- **gRPC API**: `localhost:8081`
+
+### Key Endpoints
+
+| Method | Endpoint              | Description                |
+|--------|-----------------------|----------------------------|
+| POST   | `/expectations`       | Create a new expectation   |
+| GET    | `/expectations`       | List all expectations      |
+| GET    | `/expectations/{id}`  | Get a specific expectation |
+| DELETE | `/expectations`       | Delete all expectations    |
+| POST   | `/subscriptions`      | Subscribe to a queue       |
+| GET    | `/subscriptions`      | List all subscriptions     |
+| DELETE | `/subscriptions/{id}` | Delete a subscription      |
+| GET    | `/assertions`         | Get assertion history      |
+| DELETE | `/reset`              | Reset all state            |
+| GET    | `/version`            | Get version information    |
+
+For detailed API documentation with examples, see [API Documentation](docs/API.md).
 
 ## Contributing
 
-Contributions are welcome! Please ensure all tests pass and code is properly linted before submitting a pull request.
+We welcome contributions! Please see our [Development Guide](docs/DEVELOPMENT.md) for details on:
 
+- Setting up your development environment
+- Running tests and linters
+- Code style guidelines
+- Submitting pull requests
+
+**Quick contribution checklist**:
+
+1. Fork the repository and create your branch from `main`
+2. Write tests for any new functionality
+3. Ensure all tests pass: `make test`
+4. Lint your code: `make lint`
+5. Update documentation as needed
+6. Submit a pull request with a clear description
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
